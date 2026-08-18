@@ -1,0 +1,16 @@
+---
+description: NestJS backend conventions for EstateX
+globs: apps/api/**/*.ts
+alwaysApply: false
+---
+
+# Backend
+
+- Feature modules by domain. Thin controllers. Logic in services. Prisma only via `PrismaService`.
+- Validate every write with DTOs + class-validator. Use the global exception filter.
+- Guards for JWT and roles. Ownership checks in the service after loading the resource.
+- Derive `agentId` from the property. Never trust client-supplied agent IDs.
+- Paginate list endpoints. Select only required fields. Avoid N+1 (use `include` / `select` deliberately).
+- Rate-limit public auth and inquiry endpoints. Helmet + CORS from env.
+- Swagger decorators on public-facing controllers.
+- Never return `passwordHash` or refresh token hashes.

@@ -1,0 +1,17 @@
+---
+description: Next.js frontend conventions for EstateX
+globs: apps/web/**/*.{ts,tsx,css}
+alwaysApply: false
+---
+
+# Frontend
+
+- TypeScript strict. App Router. Server Components by default.
+- `"use client"` only for forms, maps, carousels, and other browser APIs.
+- UI primitives from shadcn/ui. Domain UI in `components/property`, `search`, `map`, `agent`, `layout`.
+- Forms: React Hook Form + Zod. Server state: TanStack Query. Zustand only for compare tray / ephemeral UI.
+- Property search state lives in URL query params so links are shareable.
+- Use `next/image` for photography. Dynamic-import Leaflet.
+- Handle loading, empty, error, and retry states. No unsanitized HTML.
+- Do not trust client-side role checks for security.
+- Design tokens via CSS variables / Tailwind theme. Charcoal + warm gold, spacious, editorial. No generic dashboard templates.

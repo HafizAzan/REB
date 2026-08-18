@@ -1,0 +1,15 @@
+---
+description: Security baseline for EstateX
+alwaysApply: true
+---
+
+# Security
+
+- Hash passwords with argon2. Store refresh tokens hashed. Rotate on refresh. Revoke on logout.
+- HTTP-only cookies for tokens. Never `localStorage` for passwords or refresh tokens.
+- DTO validation, Helmet, CORS allowlist, rate limiting.
+- File uploads: allowlist jpeg/png/webp, 5MB max, ignore client MIME/filename.
+- Ownership on every mutating property/image/inquiry/visit operation.
+- Admin-only role changes. Agents cannot escalate themselves.
+- No secrets in git. No stack traces in production responses.
+- Frontend role checks are UX only.

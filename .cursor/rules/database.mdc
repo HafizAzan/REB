@@ -1,0 +1,14 @@
+---
+description: Prisma and PostgreSQL rules for EstateX
+globs: apps/api/prisma/**/*
+alwaysApply: false
+---
+
+# Database
+
+- Prisma only. UUID primary keys. Enums for all status/type fields.
+- Unique constraints: email, slug, favorite `(userId, propertyId)`, amenity name.
+- Indexes follow real query patterns: city, price, propertyType, listingType, bedrooms, status, createdAt, agentId.
+- Never expose `passwordHash`. Never log raw tokens.
+- No destructive migrations unless the user explicitly asks.
+- Public property queries filter `PUBLISHED` unless the caller is owner or admin.

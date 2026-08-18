@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  AGENT
+  ADMIN
+}
+
+enum PropertyType {
+  HOUSE
+  APARTMENT
+  VILLA
+  CONDO
+  TOWNHOUSE
+  LAND
+  COMMERCIAL
+  OFFICE
+  PENTHOUSE
+}
+
+enum ListingType {
+  SALE
+  RENT
+}
+
+enum ConstructionStatus {
+  READY_TO_MOVE
+  UNDER_CONSTRUCTION
+}
+
+enum FurnishedStatus {
+  FURNISHED
+  SEMI_FURNISHED
+  UNFURNISHED
+}
+
+enum PropertyStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  SOLD
+  RENTED
+  ARCHIVED
+}
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  IN_PROGRESS
+  CLOSED
+}
+
+enum VisitStatus {
+  REQUESTED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum AreaUnit {
+  SQFT
+  SQM
+  MARLA
+  KANAL
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  phone        String?
+  avatar       String?
+  role         Role     @default(USER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  agentProfile  AgentProfile?
+  properties    Property[]
+  favorites     Favorite[]
+  inquiries     Inquiry[]      @relation("InquiryUser")
+  agentInquiries Inquiry[]     @relation("InquiryAgent")
+  visits        Visit[]        @relation("VisitUser")
+  agentVisits   Visit[]        @relation("VisitAgent")
+  notifications Notification[]
+  refreshTokens RefreshToken[]
+  propertyViews PropertyView[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model AgentProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  bio             String?
+  agencyName      String?
+  licenseNumber   String?
+  experienceYears Int      @default(0)
+  specialties     String[] @default([])
+  socialLinks     Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Property {
+  id                 String             @id @default(uuid())
+  agentId            String
+  title              String
+  slug               String             @unique
+  description        String
+  price              Decimal            @db.Decimal(12, 2)
+  propertyType       PropertyType
+  listingType        ListingType
+  bedrooms           Int                @default(0)
+  bathrooms          Decimal            @db.Decimal(3, 1)
+  area               Decimal            @db.Decimal(12, 2)
+  areaUnit           AreaUnit           @default(SQFT)
+  furnishedStatus    FurnishedStatus    @default(UNFURNISHED)
+  constructionStatus ConstructionStatus @default(READY_TO_MOVE)
+  address            String
+  city               String
+  state              String
+  country            String             @default("Pakistan")
+  latitude           Float
+  longitude          Float
+  status             PropertyStatus     @default(DRAFT)
+  featured           Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  agent      User              @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  images     PropertyImage[]
+  amenities  PropertyAmenity[]
+  favorites  Favorite[]
+  inquiries  Inquiry[]
+  visits     Visit[]
+  views      PropertyView[]
+
+  @@index([city])
+  @@index([price])
+  @@index([propertyType])
+  @@index([listingType])
+  @@index([bedrooms])
+  @@index([status])
+  @@index([createdAt])
+  @@index([agentId])
+  @@index([status, city, listingType])
+  @@index([featured, status])
+}
+
+model PropertyImage {
+  id         String   @id @default(uuid())
+  propertyId String
+  url        String
+  publicId   String?
+  altText    String?
+  sortOrder  Int      @default(0)
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, sortOrder])
+}
+
+model Amenity {
+  id   String @id @default(uuid())
+  name String @unique
+  icon String
+
+  properties PropertyAmenity[]
+}
+
+model PropertyAmenity {
+  propertyId String
+  amenityId  String
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenity  Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, amenityId])
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String
+  propertyId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+}
+
+model Inquiry {
+  id                 String        @id @default(uuid())
+  propertyId         String
+  userId             String?
+  agentId            String
+  name               String
+  email              String
+  phone              String
+  preferredVisitDate DateTime?
+  message            String
+  status             InquiryStatus @default(NEW)
+  createdAt          DateTime      @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User?    @relation("InquiryUser", fields: [userId], references: [id], onDelete: SetNull)
+  agent    User     @relation("InquiryAgent", fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@index([agentId, status])
+  @@index([userId])
+}
+
+model Visit {
+  id          String      @id @default(uuid())
+  propertyId  String
+  userId      String
+  agentId     String
+  scheduledAt DateTime
+  status      VisitStatus @default(REQUESTED)
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User     @relation("VisitUser", fields: [userId], references: [id], onDelete: Cascade)
+  agent    User     @relation("VisitAgent", fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@index([agentId, scheduledAt])
+  @@index([userId, status])
+}
+
+model PropertyView {
+  id         String   @id @default(uuid())
+  propertyId String
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+}

@@ -1,0 +1,12 @@
+---
+description: Testing expectations for EstateX
+globs: "**/*.{spec.ts,test.ts,test.tsx}"
+alwaysApply: false
+---
+
+# Testing
+
+- Backend: Nest testing module + mocked Prisma for unit tests. e2e for auth and property search.
+- Frontend: component tests for PropertyCard, search filters, and auth forms.
+- A feature is not done until typecheck, lint, and relevant tests pass.
+- Do not assert on stack traces or secret values.

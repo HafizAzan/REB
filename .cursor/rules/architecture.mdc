@@ -1,0 +1,17 @@
+---
+description: EstateX architecture — modules, contracts, and change discipline
+alwaysApply: true
+---
+
+# Architecture
+
+EstateX is a premium real-estate marketplace: Next.js (`apps/web`) + NestJS (`apps/api`) + PostgreSQL/Prisma.
+
+- Follow `docs/architecture.md`, `docs/database.md`, and `docs/api.md`.
+- Work phase by phase. Do not implement unrelated features in the same change.
+- Prefer reusable modules over copy-paste. Avoid unnecessary dependencies.
+- Keep business logic out of Nest controllers and out of React page files.
+- Keep API envelopes consistent: `{ success, data, meta?, message?, code? }`.
+- Shared enums and DTOs belong in `packages/types` when both apps need them.
+- Never hardcode secrets. Use env vars from `.env.example`.
+- Inspect existing code before adding files. Match naming and folder patterns already in the repo.
