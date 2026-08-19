@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { CurrentUser, type AuthUser } from '../common/decorators/current-user.decorator';
+import { QueryPaginationDto } from '../common/dto/query-pagination.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateVisitStatusDto } from './dto/update-visit-status.dto';
@@ -24,8 +25,8 @@ export class VisitsController {
 
   @Roles(Role.AGENT, Role.ADMIN)
   @Get('agent')
-  agent(@CurrentUser() user: AuthUser) {
-    return this.visits.agent(user);
+  agent(@CurrentUser() user: AuthUser, @Query() query: QueryPaginationDto) {
+    return this.visits.agent(user, query);
   }
 
   @Patch(':id/status')

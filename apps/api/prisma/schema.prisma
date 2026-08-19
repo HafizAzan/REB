@@ -71,28 +71,37 @@ enum AreaUnit {
   KANAL
 }
 
-model User {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  phone        String?
-  avatar       String?
-  role         Role     @default(USER)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+enum OtpPurpose {
+  REGISTER
+  LOGIN
+  RESET_PASSWORD
+  CHANGE_EMAIL
+}
 
-  agentProfile  AgentProfile?
-  properties    Property[]
-  favorites     Favorite[]
-  inquiries     Inquiry[]      @relation("InquiryUser")
-  agentInquiries Inquiry[]     @relation("InquiryAgent")
-  visits        Visit[]        @relation("VisitUser")
-  agentVisits   Visit[]        @relation("VisitAgent")
-  notifications Notification[]
-  refreshTokens RefreshToken[]
-  propertyViews PropertyView[]
+model User {
+  id              String    @id @default(uuid())
+  name            String
+  email           String    @unique
+  passwordHash    String
+  phone           String?
+  avatar          String?
+  role            Role      @default(USER)
+  isActive        Boolean   @default(true)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  agentProfile         AgentProfile?
+  properties           Property[]
+  favorites            Favorite[]
+  inquiries            Inquiry[]           @relation("InquiryUser")
+  agentInquiries       Inquiry[]           @relation("InquiryAgent")
+  visits               Visit[]             @relation("VisitUser")
+  agentVisits          Visit[]             @relation("VisitAgent")
+  notifications        Notification[]
+  refreshTokens        RefreshToken[]
+  propertyViews        PropertyView[]
+  passwordResetTokens  PasswordResetToken[]
 
   @@index([role])
 }
@@ -103,6 +112,33 @@ model RefreshToken {
   tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model OtpChallenge {
+  id         String     @id @default(uuid())
+  email      String
+  purpose    OtpPurpose
+  codeHash   String
+  payload    Json?
+  expiresAt  DateTime
+  attempts   Int        @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([email, purpose, consumedAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

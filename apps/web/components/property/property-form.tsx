@@ -1,30 +1,20 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { apiGet, apiSend } from '@/lib/api';
+import { useAmenitiesQuery, useSavePropertyMutation } from '@/hooks/use-properties-api';
 import type { Property } from '@/types/property';
-
-interface Amenity {
-  id: string;
-  name: string;
-}
 
 export function PropertyForm({ property }: { property?: Property }) {
   const router = useRouter();
-  const [pending, setPending] = useState(false);
-  const [amenities, setAmenities] = useState<Amenity[]>([]);
+  const amenitiesQuery = useAmenitiesQuery();
+  const saveProperty = useSavePropertyMutation();
+  const amenities = amenitiesQuery.data ?? [];
   const [selected, setSelected] = useState<string[]>(property?.amenities.map((item) => item.id) ?? []);
-
-  useEffect(() => {
-    apiGet<Amenity[]>('/properties/meta/amenities')
-      .then(setAmenities)
-      .catch(() => undefined);
-  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,21 +44,16 @@ export function PropertyForm({ property }: { property?: Property }) {
       imageUrls,
     };
 
-    setPending(true);
     try {
-      if (property) {
-        await apiSend(`/properties/${property.id}`, 'PATCH', payload);
-        toast.success('Listing updated');
-      } else {
-        await apiSend('/properties', 'POST', payload);
-        toast.success('Draft created');
-      }
+      await saveProperty.mutateAsync({
+        id: property?.id,
+        payload,
+      });
+      toast.success(property ? 'Listing updated' : 'Draft created');
       router.push('/agent');
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not save listing');
-    } finally {
-      setPending(false);
     }
   }
 
@@ -161,8 +146,8 @@ export function PropertyForm({ property }: { property?: Property }) {
           );
         })}
       </div>
-      <Button type="submit" disabled={pending}>
-        {pending ? 'Saving…' : property ? 'Save changes' : 'Create draft'}
+      <Button type="submit" loading={saveProperty.isPending}>
+        {saveProperty.isPending ? 'Saving…' : property ? 'Save changes' : 'Create draft'}
       </Button>
     </form>
   );

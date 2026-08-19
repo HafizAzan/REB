@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { CurrentUser, type AuthUser } from '../common/decorators/current-user.decorator';
+import { QueryPaginationDto } from '../common/dto/query-pagination.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateInquiryDto } from './dto/create-inquiry.dto';
 import { UpdateInquiryStatusDto } from './dto/update-inquiry-status.dto';
@@ -24,8 +25,8 @@ export class InquiriesController {
 
   @Roles(Role.AGENT, Role.ADMIN)
   @Get('agent')
-  agent(@CurrentUser() user: AuthUser) {
-    return this.inquiries.agent(user);
+  agent(@CurrentUser() user: AuthUser, @Query() query: QueryPaginationDto) {
+    return this.inquiries.agent(user, query);
   }
 
   @Roles(Role.AGENT, Role.ADMIN)

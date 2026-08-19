@@ -5,7 +5,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownItem, DropdownMenu } from '@/components/ui/dropdown-menu';
+import { Modal } from '@/components/ui/modal';
 import { useAuth } from '@/components/auth/auth-provider';
 import { homeForRole } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -21,10 +23,23 @@ export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
-  async function signOut() {
-    await logout();
-    router.push('/');
+  function openSignOut() {
+    setMobileOpen(false);
+    setSignOutOpen(true);
+  }
+
+  async function confirmSignOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+      setSignOutOpen(false);
+      router.push('/');
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   return (
@@ -48,7 +63,9 @@ export function Navbar() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          {loading ? null : user ? (
+          {loading ? (
+            <Skeleton className="h-9 w-24 rounded-full" />
+          ) : user ? (
             <DropdownMenu
               trigger={
                 <Button variant="ghost" size="sm" className="gap-1">
@@ -60,8 +77,9 @@ export function Navbar() {
               <p className="px-4 pb-1 pt-2 font-display text-sm text-ink">{user.name}</p>
               <p className="px-4 pb-2 text-[11px] uppercase tracking-[0.16em] text-gold-dark">{user.role}</p>
               <DropdownItem href={homeForRole(user.role)}>Workspace</DropdownItem>
+              <DropdownItem href="/settings">Settings</DropdownItem>
               <DropdownItem href="/properties">Browse homes</DropdownItem>
-              <DropdownItem tone="muted" onSelect={() => void signOut()}>
+              <DropdownItem tone="muted" onSelect={openSignOut}>
                 Sign out
               </DropdownItem>
             </DropdownMenu>
@@ -100,7 +118,24 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {!user ? (
+            {user ? (
+              <>
+                <Link
+                  href="/settings"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm text-ink-soft transition hover:bg-cream hover:text-ink"
+                >
+                  Settings
+                </Link>
+                <button
+                  type="button"
+                  onClick={openSignOut}
+                  className="rounded-xl px-3 py-2.5 text-left text-sm text-ink-soft transition hover:bg-cream hover:text-ink"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
               <Link
                 href="/login"
                 onClick={() => setMobileOpen(false)}
@@ -108,10 +143,29 @@ export function Navbar() {
               >
                 Sign in
               </Link>
-            ) : null}
+            )}
           </nav>
         </div>
       ) : null}
+      <Modal
+        open={signOutOpen}
+        onClose={() => {
+          if (!signingOut) setSignOutOpen(false);
+        }}
+        title="Sign out?"
+      >
+        <p className="text-sm leading-6 text-ink-soft">
+          You’ll need to sign in again to access your workspace, favorites, and settings.
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="ghost" disabled={signingOut} onClick={() => setSignOutOpen(false)}>
+            Cancel
+          </Button>
+          <Button loading={signingOut} onClick={() => void confirmSignOut()}>
+            {signingOut ? 'Signing out…' : 'Sign out'}
+          </Button>
+        </div>
+      </Modal>
     </header>
   );
 }

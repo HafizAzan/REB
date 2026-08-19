@@ -40,8 +40,8 @@ NestJS API (:4000)  /api/*
 
 ## User roles
 
-| Role  | Capabilities |
-| ----- | ------------ |
+| Role  | Capabilities                                             |
+| ----- | -------------------------------------------------------- |
 | GUEST | Browse, search, view details, view agents/maps, register |
 | USER  | Favorites, compare, inquiries, visit scheduling, profile |
 | AGENT | Own listings, images, inquiries, visits, basic analytics |
@@ -66,6 +66,7 @@ Route groups:
 app/(public)/     landing, properties, agents, about, contact
 app/(auth)/       login, register, forgot/reset password
 app/dashboard/    buyer profile, favorites, inquiries, visits
+app/settings/     profile, email change (OTP), password change
 app/agent/        agent listings and workflows
 app/admin/        moderation and platform analytics
 ```
@@ -88,6 +89,8 @@ app/admin/        moderation and platform analytics
 - Refresh tokens stored hashed in PostgreSQL
 - HTTP-only, Secure, SameSite cookies
 - Logout revokes the current refresh token
+- Register and password reset require a 6-digit email OTP
+- OTP codes are hashed, expire in 10 minutes, and are rate-limited
 
 ## API contract
 
@@ -130,3 +133,11 @@ All listing filters are query params on `GET /api/properties`. Server-side pagin
 - DB: Neon / Supabase / Railway PostgreSQL
 - Images: Cloudinary
 - CI: GitHub Actions
+
+USER — buyer. Favorites, inquiries, visits, profile/settings. Demo: [user@estatex.dev](mailto:user@estatex.dev)
+
+AGENT — apni listings, images, agent inquiries/visits. Demo: [agent@estatex.dev](mailto:agent@estatex.dev)
+
+ADMIN — users, listings moderation, featured, analytics. Demo: [admin@estatex.dev](mailto:admin@estatex.dev)
+
+Password123!

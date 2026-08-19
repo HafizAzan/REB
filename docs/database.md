@@ -14,6 +14,7 @@ PropertyStatus       DRAFT | PENDING_REVIEW | PUBLISHED | SOLD | RENTED | ARCHIV
 InquiryStatus        NEW | CONTACTED | IN_PROGRESS | CLOSED
 VisitStatus          REQUESTED | CONFIRMED | CANCELLED | COMPLETED
 AreaUnit             SQFT | SQM | MARLA | KANAL
+OtpPurpose           REGISTER | LOGIN | RESET_PASSWORD | CHANGE_EMAIL
 ```
 
 ## Models
@@ -30,10 +31,11 @@ AreaUnit             SQFT | SQM | MARLA | KANAL
 | avatar       | optional URL                   |
 | role         | Role, default USER             |
 | isActive     | default true                   |
+| emailVerifiedAt | set after OTP verify        |
 | createdAt    |                                |
 | updatedAt    |                                |
 
-Relations: `agentProfile`, `properties` (as agent), `favorites`, `inquiries`, `visits`, `notifications`, `refreshTokens`, `propertyViews`.
+Relations: `agentProfile`, `properties` (as agent), `favorites`, `inquiries`, `visits`, `notifications`, `refreshTokens`, `propertyViews`, `passwordResetTokens`.
 
 ### RefreshToken
 
@@ -47,6 +49,39 @@ Rotating refresh sessions.
 | expiresAt |                      |
 | revokedAt | nullable             |
 | createdAt |                      |
+
+Index: `(userId, expiresAt)`.
+
+### OtpChallenge
+
+Hashed one-time codes for register, login verification, and password reset.
+
+| Field      | Notes                                      |
+| ---------- | ------------------------------------------ |
+| id         | UUID PK                                    |
+| email      |                                            |
+| purpose    | REGISTER \| LOGIN \| RESET_PASSWORD        |
+| codeHash   | SHA-256 of email + purpose + code          |
+| payload    | JSON, pending registration fields          |
+| expiresAt  | 10 minutes                                 |
+| attempts   | lock after 5                               |
+| consumedAt | nullable                                   |
+| createdAt  | used for 60s resend cooldown               |
+
+Index: `(email, purpose, consumedAt)`.
+
+### PasswordResetToken
+
+Issued only after a successful reset OTP. Single-use, 15 minutes.
+
+| Field     | Notes        |
+| --------- | ------------ |
+| id        | UUID PK      |
+| userId    | FK User      |
+| tokenHash | unique       |
+| expiresAt |              |
+| usedAt    | nullable     |
+| createdAt |              |
 
 Index: `(userId, expiresAt)`.
 

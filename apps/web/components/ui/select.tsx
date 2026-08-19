@@ -103,7 +103,7 @@ export function Select({
                 : { top: box.bottom + 8 }),
             }}
             className={cn(
-              'estatex-menu estatex-scroll max-h-64 overflow-y-auto overflow-x-hidden rounded-2xl py-1.5',
+              'estatex-menu estatex-scroll max-h-64 overflow-y-auto overflow-x-hidden rounded-none py-1.5',
               open ? 'animate-pop-in' : 'animate-pop-out',
             )}
           >

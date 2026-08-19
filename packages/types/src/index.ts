@@ -55,6 +55,8 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
+export type OtpPurpose = 'REGISTER' | 'LOGIN' | 'RESET_PASSWORD' | 'CHANGE_EMAIL';
+
 export interface PublicUser {
   id: string;
   name: string;
@@ -63,6 +65,7 @@ export interface PublicUser {
   avatar: string | null;
   role: Role;
   isActive: boolean;
+  emailVerifiedAt: string | null;
   createdAt: string;
 }
 

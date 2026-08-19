@@ -2,46 +2,60 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { FormEvent } from 'react';
 import { toast } from 'sonner';
+import { AuthShell } from '@/components/auth/auth-shell';
+import { GuestOnly } from '@/components/auth/guest-only';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/components/auth/auth-provider';
-import { homeForRole, type AuthUser } from '@/lib/auth';
-import { apiSend } from '@/lib/api';
+import { useRegisterMutation } from '@/hooks/use-auth-api';
+import { rememberDevOtp } from '@/lib/auth';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { refresh } = useAuth();
-  const [pending, setPending] = useState(false);
+  const register = useRegisterMutation();
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    setPending(true);
+    const password = String(form.get('password') ?? '');
+    const confirm = String(form.get('confirm') ?? '');
+    if (password !== confirm) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
     try {
-      const user = await apiSend<AuthUser>('/auth/register', 'POST', {
-        name: form.get('name'),
-        email: form.get('email'),
-        phone: form.get('phone') || undefined,
-        password: form.get('password'),
+      const issued = await register.mutateAsync({
+        name: String(form.get('name') ?? ''),
+        email: String(form.get('email') ?? ''),
+        phone: String(form.get('phone') ?? '') || undefined,
+        password,
       });
-      await refresh();
-      toast.success('Account created');
-      router.push(homeForRole(user.role));
-      router.refresh();
+      rememberDevOtp(issued.devOtp);
+      toast.success('We sent a 6-digit code to your email');
+      router.push(`/verify-otp?email=${encodeURIComponent(issued.email)}&purpose=REGISTER`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to register');
-    } finally {
-      setPending(false);
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-16">
-      <p className="text-xs uppercase tracking-[0.18em] text-gold-dark">Start here</p>
-      <h1 className="mt-2 font-display text-4xl">Create an account</h1>
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+    <GuestOnly>
+    <AuthShell
+      eyebrow="Start here"
+      title="Create an account"
+      description="We’ll email you a one-time code before your account goes live."
+      footer={
+        <p>
+          Already registered?{' '}
+          <Link href="/login" className="text-ink underline">
+            Sign in
+          </Link>
+        </p>
+      }
+    >
+      <form onSubmit={onSubmit} className="space-y-4">
         <Input name="name" required placeholder="Full name" autoComplete="name" />
         <Input name="email" type="email" required placeholder="Email" autoComplete="email" />
         <Input name="phone" placeholder="Phone (optional)" autoComplete="tel" />
@@ -53,16 +67,19 @@ export default function RegisterPage() {
           placeholder="Password (min 8 characters)"
           autoComplete="new-password"
         />
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? 'Creating…' : 'Create account'}
+        <Input
+          name="confirm"
+          type="password"
+          required
+          minLength={8}
+          placeholder="Confirm password"
+          autoComplete="new-password"
+        />
+        <Button type="submit" fullWidth loading={register.isPending}>
+          {register.isPending ? 'Sending code…' : 'Continue'}
         </Button>
       </form>
-      <p className="mt-6 text-sm text-ink-soft">
-        Already registered?{' '}
-        <Link href="/login" className="text-ink underline">
-          Sign in
-        </Link>
-      </p>
-    </div>
+    </AuthShell>
+    </GuestOnly>
   );
 }

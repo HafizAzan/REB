@@ -1,15 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { apiGet, apiSend } from '@/lib/api';
-import { type AuthUser } from '@/lib/auth';
-
-interface AuthContextValue {
-  user: AuthUser | null;
-  loading: boolean;
-  refresh: () => Promise<void>;
-  logout: () => Promise<void>;
-}
+import { useQueryClient } from '@tanstack/react-query';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import { authKeys, useAuthUserQuery, useLogoutMutation } from '@/hooks/use-auth-api';
+import type { AuthContextValue } from '@/types/auth';
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
@@ -19,33 +13,31 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const meQuery = useAuthUserQuery();
+  const logoutMutation = useLogoutMutation();
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: authKeys.me });
+  }, [queryClient]);
+
+  const logout = useCallback(async () => {
     try {
-      const me = await apiGet<AuthUser>('/auth/me');
-      setUser(me);
+      await logoutMutation.mutateAsync();
     } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
+      queryClient.setQueryData(authKeys.me, null);
     }
-  }
+  }, [logoutMutation, queryClient]);
 
-  async function logout() {
-    try {
-      await apiSend('/auth/logout', 'POST');
-    } finally {
-      setUser(null);
-    }
-  }
-
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  const value = useMemo(() => ({ user, loading, refresh, logout }), [user, loading]);
+  const value = useMemo(
+    () => ({
+      user: meQuery.data ?? null,
+      loading: meQuery.isPending,
+      refresh,
+      logout,
+    }),
+    [logout, meQuery.data, meQuery.isPending, refresh],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

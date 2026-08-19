@@ -1,15 +1,15 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { apiSend } from '@/lib/api';
+import { useCreateInquiryMutation } from '@/hooks/use-inquiries-api';
 
 export function InquiryForm({ propertyId }: { propertyId: string }) {
   const { user } = useAuth();
-  const [pending, setPending] = useState(false);
+  const createInquiry = useCreateInquiryMutation();
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -17,23 +17,21 @@ export function InquiryForm({ propertyId }: { propertyId: string }) {
       window.location.href = '/login';
       return;
     }
-    const form = new FormData(event.currentTarget);
-    setPending(true);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     try {
-      await apiSend('/inquiries', 'POST', {
+      await createInquiry.mutateAsync({
         propertyId,
-        name: form.get('name'),
-        email: form.get('email'),
-        phone: form.get('phone'),
-        preferredVisitDate: form.get('preferredVisitDate') || undefined,
-        message: form.get('message'),
+        name: data.get('name'),
+        email: data.get('email'),
+        phone: data.get('phone'),
+        preferredVisitDate: data.get('preferredVisitDate') || undefined,
+        message: data.get('message'),
       });
       toast.success('Inquiry sent to the agent');
-      event.currentTarget.reset();
+      form.reset();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not send inquiry');
-    } finally {
-      setPending(false);
     }
   }
 
@@ -51,8 +49,8 @@ export function InquiryForm({ propertyId }: { propertyId: string }) {
         placeholder="Tell the agent what you’re looking for"
         className="min-h-28 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
       />
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? 'Sending…' : 'Send inquiry'}
+      <Button type="submit" fullWidth loading={createInquiry.isPending}>
+        {createInquiry.isPending ? 'Sending…' : 'Send inquiry'}
       </Button>
     </form>
   );

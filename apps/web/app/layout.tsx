@@ -2,9 +2,9 @@ import { Fraunces, Outfit } from 'next/font/google';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Toaster } from 'sonner';
-import { AuthProvider } from '@/components/auth/auth-provider';
 import { Footer } from '@/components/layout/footer';
 import { Navbar } from '@/components/layout/navbar';
+import { AppProviders } from '@/components/providers';
 import './globals.css';
 
 const outfit = Outfit({
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${outfit.variable} ${fraunces.variable}`}>
       <body className="min-h-dvh bg-paper font-sans text-ink antialiased">
-        <AuthProvider>
+        <AppProviders>
           <div className="flex min-h-dvh flex-col">
             <Navbar />
             <main className="flex-1 animate-rise-in">{children}</main>
@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 '!rounded-2xl !border !border-ink/10 !bg-paper !text-ink !shadow-[0_18px_40px_rgba(22,21,19,0.12)]',
             }}
           />
-        </AuthProvider>
+        </AppProviders>
       </body>
     </html>
   );

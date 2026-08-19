@@ -1,15 +1,15 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { apiSend } from '@/lib/api';
+import { useCreateVisitMutation } from '@/hooks/use-visits-api';
 
 export function VisitForm({ propertyId }: { propertyId: string }) {
   const { user } = useAuth();
-  const [pending, setPending] = useState(false);
+  const createVisit = useCreateVisitMutation();
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -17,20 +17,18 @@ export function VisitForm({ propertyId }: { propertyId: string }) {
       window.location.href = '/login';
       return;
     }
-    const form = new FormData(event.currentTarget);
-    setPending(true);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     try {
-      await apiSend('/visits', 'POST', {
+      await createVisit.mutateAsync({
         propertyId,
-        scheduledAt: new Date(String(form.get('scheduledAt'))).toISOString(),
-        notes: form.get('notes') || undefined,
+        scheduledAt: new Date(String(data.get('scheduledAt'))).toISOString(),
+        notes: data.get('notes') || undefined,
       });
       toast.success('Visit requested');
-      event.currentTarget.reset();
+      form.reset();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not request visit');
-    } finally {
-      setPending(false);
     }
   }
 
@@ -39,8 +37,8 @@ export function VisitForm({ propertyId }: { propertyId: string }) {
       <h3 className="font-display text-2xl">Schedule a visit</h3>
       <Input name="scheduledAt" type="datetime-local" required />
       <Input name="notes" placeholder="Anything the agent should know?" />
-      <Button type="submit" variant="outline" className="w-full" disabled={pending}>
-        {pending ? 'Requesting…' : 'Request visit'}
+      <Button type="submit" variant="outline" fullWidth loading={createVisit.isPending}>
+        {createVisit.isPending ? 'Requesting…' : 'Request visit'}
       </Button>
     </form>
   );

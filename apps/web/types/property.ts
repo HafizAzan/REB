@@ -44,16 +44,3 @@ export interface Property {
   amenities: PropertyAmenity[];
   agent: PropertyAgent;
 }
-
-export interface Agent {
-  id: string;
-  name: string;
-  avatar: string | null;
-  agentProfile: {
-    bio: string | null;
-    agencyName: string | null;
-    experienceYears: number;
-    specialties: string[];
-  } | null;
-  _count?: { properties: number };
-}

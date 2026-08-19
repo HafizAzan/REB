@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PropertyStatus, Role } from '@prisma/client';
 import type { AuthUser } from '../common/decorators/current-user.decorator';
+import { QueryPaginationDto } from '../common/dto/query-pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInquiryDto } from './dto/create-inquiry.dto';
 import { UpdateInquiryStatusDto } from './dto/update-inquiry-status.dto';
@@ -57,17 +58,34 @@ export class InquiriesService {
     });
   }
 
-  agent(user: AuthUser) {
+  async agent(user: AuthUser, query: QueryPaginationDto) {
     if (user.role !== Role.AGENT && user.role !== Role.ADMIN) {
       throw new ForbiddenException();
     }
-    return this.prisma.inquiry.findMany({
-      where: user.role === Role.ADMIN ? {} : { agentId: user.id },
-      include: {
-        property: { select: { id: true, title: true, slug: true, city: true } },
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const where = user.role === Role.ADMIN ? {} : { agentId: user.id };
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.inquiry.count({ where }),
+      this.prisma.inquiry.findMany({
+        where,
+        include: {
+          property: { select: { id: true, title: true, slug: true, city: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+    return {
+      data: rows,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 
   async updateStatus(user: AuthUser, id: string, dto: UpdateInquiryStatusDto) {

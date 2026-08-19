@@ -9,6 +9,7 @@ import {
   Role,
 } from '@prisma/client';
 import type { AuthUser } from '../common/decorators/current-user.decorator';
+import { QueryPaginationDto } from '../common/dto/query-pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { QueryPropertiesDto } from './dto/query-properties.dto';
@@ -132,14 +133,46 @@ export class PropertiesService {
     return this.prisma.amenity.findMany({ orderBy: { name: 'asc' } });
   }
 
-  async findMine(user: AuthUser) {
+  async findMine(user: AuthUser, query: QueryPaginationDto) {
     this.assertAgent(user);
-    const rows = await this.prisma.property.findMany({
-      where: user.role === Role.ADMIN ? {} : { agentId: user.id },
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const where = user.role === Role.ADMIN ? {} : { agentId: user.id };
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.property.count({ where }),
+      this.prisma.property.findMany({
+        where,
+        include: listInclude,
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+    return {
+      data: rows.map((row) => this.serialize(row)),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
+  }
+
+  async findMineOne(user: AuthUser, id: string) {
+    this.assertAgent(user);
+    await this.requireOwned(user, id);
+    const property = await this.prisma.property.findUnique({
+      where: { id },
       include: listInclude,
-      orderBy: { updatedAt: 'desc' },
     });
-    return rows.map((row) => this.serialize(row));
+    if (!property) {
+      throw new NotFoundException({
+        message: 'Property not found',
+        code: 'PROPERTY_NOT_FOUND',
+      });
+    }
+    return this.serialize(property);
   }
 
   async create(user: AuthUser, dto: CreatePropertyDto) {

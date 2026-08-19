@@ -1,50 +1,31 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { DashboardSkeleton, ListRowsSkeleton, PropertyGridSkeleton } from '@/components/ui/skeleton';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAuth } from '@/components/auth/auth-provider';
 import { PropertyCard } from '@/components/property/property-card';
-import { apiGet, apiSend } from '@/lib/api';
+import { useFavoritesQuery } from '@/hooks/use-favorites-api';
+import { useMyInquiriesQuery } from '@/hooks/use-inquiries-api';
+import { useMyVisitsQuery, useUpdateVisitStatusMutation } from '@/hooks/use-visits-api';
 import { prettyEnum } from '@/lib/format';
-import type { Property } from '@/types/property';
-
-interface InquiryRow {
-  id: string;
-  status: string;
-  message: string;
-  createdAt: string;
-  property: { title: string; slug: string; city: string };
-}
-
-interface VisitRow {
-  id: string;
-  status: string;
-  scheduledAt: string;
-  property: { title: string; slug: string; city: string };
-}
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
-  const [favorites, setFavorites] = useState<Property[]>([]);
-  const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
-  const [visits, setVisits] = useState<VisitRow[]>([]);
+  const enabled = Boolean(user);
+  const favoritesQuery = useFavoritesQuery(enabled);
+  const inquiriesQuery = useMyInquiriesQuery(enabled);
+  const visitsQuery = useMyVisitsQuery(enabled);
+  const updateVisit = useUpdateVisitStatusMutation();
+  const [cancelVisit, setCancelVisit] = useState<{ id: string; title: string } | null>(null);
 
-  useEffect(() => {
-    if (!user) return;
-    Promise.all([
-      apiGet<Property[]>('/favorites'),
-      apiGet<InquiryRow[]>('/inquiries/my'),
-      apiGet<VisitRow[]>('/visits/my'),
-    ])
-      .then(([saved, myInquiries, myVisits]) => {
-        setFavorites(saved);
-        setInquiries(myInquiries);
-        setVisits(myVisits);
-      })
-      .catch(() => undefined);
-  }, [user]);
+  const favorites = favoritesQuery.data ?? [];
+  const inquiries = inquiriesQuery.data ?? [];
+  const visits = visitsQuery.data ?? [];
 
-  if (loading) return <p className="px-4 py-20 text-center text-ink-soft">Loading…</p>;
+  if (loading) return <DashboardSkeleton />;
   if (!user) {
     return (
       <div className="mx-auto max-w-xl px-4 py-20 text-center">
@@ -63,7 +44,9 @@ export default function DashboardPage() {
 
       <section className="mt-12">
         <h2 className="font-display text-3xl">Favorites</h2>
-        {favorites.length ? (
+        {favoritesQuery.isPending ? (
+          <PropertyGridSkeleton className="mt-6" count={3} />
+        ) : favorites.length ? (
           <div className="mt-6 grid gap-6 md:grid-cols-3">
             {favorites.map((property) => (
               <PropertyCard key={property.id} property={property} />
@@ -77,52 +60,77 @@ export default function DashboardPage() {
       <section className="mt-14 grid gap-8 lg:grid-cols-2">
         <div>
           <h2 className="font-display text-3xl">Inquiries</h2>
-          <ul className="mt-4 space-y-3">
-            {inquiries.map((item) => (
-              <li key={item.id} className="rounded-2xl border border-line bg-white p-4">
-                <Link href={`/properties/${item.property.slug}`} className="font-medium">
-                  {item.property.title}
-                </Link>
-                <p className="text-sm text-ink-soft">{prettyEnum(item.status)}</p>
-                <p className="mt-2 text-sm">{item.message}</p>
-              </li>
-            ))}
-            {!inquiries.length ? <p className="text-ink-soft">No inquiries yet.</p> : null}
-          </ul>
+          {inquiriesQuery.isPending ? (
+            <ListRowsSkeleton className="mt-4" />
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {inquiries.map((item) => (
+                <li key={item.id} className="rounded-2xl border border-line bg-white p-4">
+                  <Link href={`/properties/${item.property.slug}`} className="font-medium">
+                    {item.property.title}
+                  </Link>
+                  <p className="text-sm text-ink-soft">{prettyEnum(item.status)}</p>
+                  <p className="mt-2 text-sm">{item.message}</p>
+                </li>
+              ))}
+              {!inquiries.length ? <p className="text-ink-soft">No inquiries yet.</p> : null}
+            </ul>
+          )}
         </div>
         <div>
           <h2 className="font-display text-3xl">Visits</h2>
-          <ul className="mt-4 space-y-3">
-            {visits.map((item) => (
-              <li key={item.id} className="rounded-2xl border border-line bg-white p-4">
-                <Link href={`/properties/${item.property.slug}`} className="font-medium">
-                  {item.property.title}
-                </Link>
-                <p className="text-sm text-ink-soft">
-                  {prettyEnum(item.status)} · {new Date(item.scheduledAt).toLocaleString()}
-                </p>
-                {item.status === 'REQUESTED' || item.status === 'CONFIRMED' ? (
-                  <button
-                    type="button"
-                    className="mt-2 text-sm underline"
-                    onClick={async () => {
-                      await apiSend(`/visits/${item.id}/status`, 'PATCH', { status: 'CANCELLED' });
-                      setVisits((current) =>
-                        current.map((row) =>
-                          row.id === item.id ? { ...row, status: 'CANCELLED' } : row,
-                        ),
-                      );
-                    }}
-                  >
-                    Cancel
-                  </button>
-                ) : null}
-              </li>
-            ))}
-            {!visits.length ? <p className="text-ink-soft">No visits scheduled.</p> : null}
-          </ul>
+          {visitsQuery.isPending ? (
+            <ListRowsSkeleton className="mt-4" />
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {visits.map((item) => (
+                <li key={item.id} className="rounded-2xl border border-line bg-white p-4">
+                  <Link href={`/properties/${item.property.slug}`} className="font-medium">
+                    {item.property.title}
+                  </Link>
+                  <p className="text-sm text-ink-soft">
+                    {prettyEnum(item.status)} · {new Date(item.scheduledAt).toLocaleString()}
+                  </p>
+                  {item.status === 'REQUESTED' || item.status === 'CONFIRMED' ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-sm underline disabled:opacity-50"
+                      disabled={updateVisit.isPending}
+                      onClick={() => setCancelVisit({ id: item.id, title: item.property.title })}
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+              {!visits.length ? <p className="text-ink-soft">No visits scheduled.</p> : null}
+            </ul>
+          )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(cancelVisit)}
+        title="Cancel this visit?"
+        description={`The visit for “${cancelVisit?.title ?? 'this listing'}” will be cancelled.`}
+        confirmLabel="Cancel visit"
+        danger
+        loading={updateVisit.isPending}
+        onClose={() => setCancelVisit(null)}
+        onConfirm={() => {
+          if (!cancelVisit) return;
+          updateVisit.mutate(
+            { id: cancelVisit.id, status: 'CANCELLED' },
+            {
+              onSuccess: () => {
+                toast.success('Visit cancelled');
+                setCancelVisit(null);
+              },
+              onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed'),
+            },
+          );
+        }}
+      />
     </div>
   );
 }

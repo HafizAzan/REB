@@ -1,52 +1,41 @@
+'use client';
+
 import Link from 'next/link';
-import { apiList } from '@/lib/api';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { PropertyCard } from '@/components/property/property-card';
+import { PropertiesBrowserSkeleton, PropertyGridSkeleton } from '@/components/ui/skeleton';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import type { Property } from '@/types/property';
-import type { PaginationMeta } from '@/lib/api';
+import { usePropertiesQuery } from '@/hooks/use-properties-api';
 
-interface PageProps {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
+const FILTER_KEYS = [
+  'search',
+  'city',
+  'propertyType',
+  'listingType',
+  'bedrooms',
+  'minPrice',
+  'maxPrice',
+  'featured',
+  'page',
+  'sort',
+  'order',
+];
 
-function first(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-export default async function PropertiesPage({ searchParams }: PageProps) {
-  const params = await searchParams;
+function PropertiesBrowser() {
+  const searchParams = useSearchParams();
   const query = new URLSearchParams();
-  const keys = [
-    'search',
-    'city',
-    'propertyType',
-    'listingType',
-    'bedrooms',
-    'minPrice',
-    'maxPrice',
-    'featured',
-    'page',
-    'sort',
-    'order',
-  ];
-  for (const key of keys) {
-    const value = first(params[key]);
+  for (const key of FILTER_KEYS) {
+    const value = searchParams.get(key);
     if (value) query.set(key, value);
   }
   if (!query.get('limit')) query.set('limit', '12');
 
-  let properties: Property[] = [];
-  let meta: PaginationMeta | undefined;
-  try {
-    const result = await apiList<Property[]>(`/properties?${query.toString()}`);
-    properties = result.data ?? [];
-    meta = result.meta;
-  } catch {
-    properties = [];
-  }
-
+  const listQuery = usePropertiesQuery(query.toString());
+  const properties = listQuery.data?.data ?? [];
+  const meta = listQuery.data?.meta;
   const currentPage = Number(query.get('page') ?? 1);
 
   return (
@@ -58,11 +47,11 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
       </p>
 
       <form className="mt-8 grid gap-3 rounded-2xl border border-line bg-white p-4 md:grid-cols-6">
-        <Input name="search" defaultValue={first(params.search)} placeholder="Keyword" className="md:col-span-2" />
-        <Input name="city" defaultValue={first(params.city)} placeholder="City" />
+        <Input name="search" defaultValue={searchParams.get('search') ?? ''} placeholder="Keyword" className="md:col-span-2" />
+        <Input name="city" defaultValue={searchParams.get('city') ?? ''} placeholder="City" />
         <Select
           name="propertyType"
-          defaultValue={first(params.propertyType) ?? ''}
+          defaultValue={searchParams.get('propertyType') ?? ''}
           placeholder="Any type"
           options={[
             { value: '', label: 'Any type' },
@@ -76,7 +65,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
         />
         <Select
           name="listingType"
-          defaultValue={first(params.listingType) ?? ''}
+          defaultValue={searchParams.get('listingType') ?? ''}
           placeholder="Buy or rent"
           options={[
             { value: '', label: 'Buy or rent' },
@@ -87,7 +76,9 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
         <Button type="submit">Apply</Button>
       </form>
 
-      {properties.length ? (
+      {listQuery.isPending ? (
+        <PropertyGridSkeleton className="mt-10" />
+      ) : properties.length ? (
         <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {properties.map((property) => (
             <PropertyCard key={property.id} property={property} />
@@ -123,5 +114,13 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function PropertiesPage() {
+  return (
+    <Suspense fallback={<PropertiesBrowserSkeleton />}>
+      <PropertiesBrowser />
+    </Suspense>
   );
 }

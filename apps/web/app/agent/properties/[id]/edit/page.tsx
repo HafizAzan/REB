@@ -1,28 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use } from 'react';
 import { PropertyForm } from '@/components/property/property-form';
-import { apiGet } from '@/lib/api';
-import type { Property } from '@/types/property';
+import { FormSkeleton } from '@/components/ui/skeleton';
+import { Typography } from '@/components/ui/typography';
+import { useMyPropertyQuery } from '@/hooks/use-properties-api';
 
 export default function EditPropertyPage({ params }: { params: Promise<{ id: string }> }) {
-  const [property, setProperty] = useState<Property | null>(null);
+  const { id } = use(params);
+  const listingQuery = useMyPropertyQuery(id, true);
+  const property = listingQuery.data ?? null;
 
-  useEffect(() => {
-    void params.then(async ({ id }) => {
-      const listings = await apiGet<Property[]>('/properties/mine');
-      setProperty(listings.find((item) => item.id === id) ?? null);
-    });
-  }, [params]);
+  if (listingQuery.isPending) {
+    return <FormSkeleton />;
+  }
 
   if (!property) {
-    return <p className="px-4 py-20 text-center text-ink-soft">Loading listing…</p>;
+    return (
+      <Typography variant="muted" className="py-10 text-center">
+        Listing not found.
+      </Typography>
+    );
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <p className="text-xs uppercase tracking-[0.18em] text-gold-dark">Agent</p>
-      <h1 className="mt-2 font-display text-4xl">Edit listing</h1>
+    <div className="max-w-3xl">
+      <Typography variant="heading">Edit listing</Typography>
       <div className="mt-8">
         <PropertyForm property={property} />
       </div>

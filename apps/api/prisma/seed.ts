@@ -32,6 +32,8 @@ async function main() {
   await prisma.visit.deleteMany();
   await prisma.propertyView.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.otpChallenge.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.property.deleteMany();
   await prisma.amenity.deleteMany();
@@ -48,6 +50,7 @@ async function main() {
         passwordHash,
         phone: '+92 300 1112233',
         role: Role.USER,
+        emailVerifiedAt: new Date(),
       },
     }),
     prisma.user.create({
@@ -59,6 +62,7 @@ async function main() {
         avatar:
           'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
         role: Role.AGENT,
+        emailVerifiedAt: new Date(),
         agentProfile: {
           create: {
             bio: 'Luxury residential specialist covering Karachi and Islamabad for the last 12 years.',
@@ -77,6 +81,7 @@ async function main() {
         email: 'admin@estatex.dev',
         passwordHash,
         role: Role.ADMIN,
+        emailVerifiedAt: new Date(),
       },
     }),
   ]);

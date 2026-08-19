@@ -14,21 +14,28 @@ Error: `{ "success": false, "message": string, "code": string }`
 
 | Method | Path | Auth | Notes |
 | ------ | ---- | ---- | ----- |
-| POST   | `/auth/register` | public | body: name, email, password, phone? |
-| POST   | `/auth/login` | public | sets cookies |
+| POST   | `/auth/register` | public | body: name, email, password, phone? Sends a 6-digit OTP. Account is created after verify. |
+| POST   | `/auth/login` | public | password login. Unverified accounts return `next: verify_email` and send OTP. Verified accounts set cookies. |
+| POST   | `/auth/forgot-password` | public | body: email. Always succeeds. Sends OTP when the account exists. |
+| POST   | `/auth/otp/resend` | public | body: email, purpose (`REGISTER` \| `LOGIN` \| `RESET_PASSWORD`) |
+| POST   | `/auth/otp/verify` | public | body: email, purpose, code. Register/login issue cookies. Reset returns a one-time `resetToken`. |
+| POST   | `/auth/reset-password` | public | body: email, resetToken, password. Revokes refresh sessions. |
 | POST   | `/auth/refresh` | refresh cookie | rotates refresh token |
 | POST   | `/auth/logout` | refresh cookie | revokes token, clears cookies |
 | GET    | `/auth/me` | access cookie | current user without password |
 
-Register defaults to `USER`. Agent/admin promotion is admin-only.
+OTP codes expire in 10 minutes, are hashed at rest, and are limited to 5 attempts. Resend cooldown is 60 seconds. Register defaults to `USER`. Agent/admin promotion is admin-only. In non-production, OTP responses may include `devOtp` for local testing.
 
 ## Users
 
 | Method | Path | Auth |
 | ------ | ---- | ---- |
-| GET    | `/users/me` | USER+ |
-| PATCH  | `/users/me` | USER+ |
-| PATCH  | `/users/me/password` | USER+ |
+| GET    | `/users/me` | USER+ | current profile |
+| PATCH  | `/users/me` | USER+ | body: name?, phone?, avatar? |
+| PATCH  | `/users/me/password` | USER+ | body: currentPassword, newPassword. Rotates session cookies. |
+| POST   | `/users/me/email` | USER+ | body: email, password. Sends OTP to the new address. |
+| POST   | `/users/me/email/resend` | USER+ | body: email |
+| POST   | `/users/me/email/verify` | USER+ | body: email, code. Updates email and rotates session cookies. |
 
 ## Agents
 

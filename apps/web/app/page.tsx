@@ -1,10 +1,15 @@
+'use client';
+
 import Link from 'next/link';
 import { ArrowRight, Building2, KeyRound, ShieldCheck, Sparkles } from 'lucide-react';
-import { apiList } from '@/lib/api';
 import { PropertyCard } from '@/components/property/property-card';
 import { HeroSearch } from '@/components/search/hero-search';
+import { useAuth } from '@/components/auth/auth-provider';
 import { Button } from '@/components/ui/button';
-import type { Agent, Property } from '@/types/property';
+import { AgentGridSkeleton, PropertyGridSkeleton } from '@/components/ui/skeleton';
+import { Typography } from '@/components/ui/typography';
+import { useAgentsQuery } from '@/hooks/use-agents-api';
+import { usePropertiesQuery } from '@/hooks/use-properties-api';
 
 const categories = [
   { label: 'Villas', query: 'propertyType=VILLA', image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=900&q=80' },
@@ -13,25 +18,14 @@ const categories = [
   { label: 'Penthouses', query: 'propertyType=PENTHOUSE', image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=900&q=80' },
 ];
 
-export default async function HomePage() {
-  let featured: Property[] = [];
-  let latest: Property[] = [];
-  let agents: Agent[] = [];
-
-  try {
-    const [featuredRes, latestRes, agentsRes] = await Promise.all([
-      apiList<Property[]>('/properties?featured=true&limit=4'),
-      apiList<Property[]>('/properties?limit=6&sort=createdAt&order=desc'),
-      apiList<Agent[]>('/agents'),
-    ]);
-    featured = featuredRes.data ?? [];
-    latest = latestRes.data ?? [];
-    agents = Array.isArray(agentsRes.data) ? agentsRes.data.slice(0, 3) : [];
-  } catch {
-    featured = [];
-    latest = [];
-    agents = [];
-  }
+export default function HomePage() {
+  const { user } = useAuth();
+  const featuredQuery = usePropertiesQuery('featured=true&limit=4');
+  const latestQuery = usePropertiesQuery('limit=6&sort=createdAt&order=desc');
+  const agentsQuery = useAgentsQuery();
+  const featured = featuredQuery.data?.data ?? [];
+  const latest = latestQuery.data?.data ?? [];
+  const agents = (agentsQuery.data ?? []).slice(0, 3);
 
   return (
     <>
@@ -69,7 +63,9 @@ export default async function HomePage() {
             View all <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        {featured.length ? (
+        {featuredQuery.isPending ? (
+          <PropertyGridSkeleton count={4} columns={2} />
+        ) : featured.length ? (
           <div className="grid gap-6 md:grid-cols-2">
             {featured.map((property) => (
               <PropertyCard key={property.id} property={property} />
@@ -131,24 +127,28 @@ export default async function HomePage() {
               All agents
             </Link>
           </div>
-          <div className="grid gap-6 md:grid-cols-3">
-            {agents.length
-              ? agents.map((agent) => (
-                  <Link
-                    key={agent.id}
-                    href={`/agents/${agent.id}`}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-6 transition hover:bg-white/10"
-                  >
-                    <p className="font-display text-2xl">{agent.name}</p>
-                    <p className="mt-1 text-sm text-gold">{agent.agentProfile?.agencyName}</p>
-                    <p className="mt-3 line-clamp-3 text-sm text-paper/70">{agent.agentProfile?.bio}</p>
-                    <p className="mt-4 text-xs uppercase tracking-widest text-paper/50">
-                      {agent.agentProfile?.experienceYears} years · {agent._count?.properties ?? 0} listings
-                    </p>
-                  </Link>
-                ))
-              : <p className="text-paper/60">Agents appear after the database is seeded.</p>}
-          </div>
+          {agentsQuery.isPending ? (
+            <AgentGridSkeleton count={3} tone="dark" />
+          ) : agents.length ? (
+            <div className="grid gap-6 md:grid-cols-3">
+              {agents.map((agent) => (
+                <Link
+                  key={agent.id}
+                  href={`/agents/${agent.id}`}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-6 transition hover:bg-white/10"
+                >
+                  <p className="font-display text-2xl">{agent.name}</p>
+                  <p className="mt-1 text-sm text-gold">{agent.agentProfile?.agencyName}</p>
+                  <p className="mt-3 line-clamp-3 text-sm text-paper/70">{agent.agentProfile?.bio}</p>
+                  <p className="mt-4 text-xs uppercase tracking-widest text-paper/50">
+                    {agent.agentProfile?.experienceYears} years · {agent._count?.properties ?? 0} listings
+                  </p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-paper/60">Agents appear after the database is seeded.</p>
+          )}
         </div>
       </section>
 
@@ -159,7 +159,9 @@ export default async function HomePage() {
             Browse marketplace
           </Link>
         </div>
-        {latest.length ? (
+        {latestQuery.isPending ? (
+          <PropertyGridSkeleton count={6} />
+        ) : latest.length ? (
           <div className="grid gap-6 md:grid-cols-3">
             {latest.map((property) => (
               <PropertyCard key={property.id} property={property} />
@@ -201,21 +203,25 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
-        <div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] bg-ink px-8 py-12 text-paper md:flex-row md:items-center md:px-12">
-          <div>
-            <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-gold">
-              <Building2 className="h-4 w-4" /> For agents
-            </p>
-            <h2 className="mt-3 max-w-xl font-display text-4xl">List once. Look like a studio.</h2>
+      {!user ? (
+        <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] bg-ink px-8 py-12 text-paper md:flex-row md:items-center md:px-12">
+            <div>
+              <Typography variant="eyebrow" className="flex items-center gap-2 text-gold">
+                <Building2 className="h-4 w-4" /> For agents
+              </Typography>
+              <Typography variant="heading" tone="paper" className="mt-3 max-w-xl">
+                List once. Look like a studio.
+              </Typography>
+            </div>
+            <Link href="/register">
+              <Button variant="gold" size="lg">
+                Create your account
+              </Button>
+            </Link>
           </div>
-          <Link href="/register">
-            <Button variant="gold" size="lg">
-              Create your account
-            </Button>
-          </Link>
-        </div>
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

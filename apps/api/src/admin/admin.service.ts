@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PropertyStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { QueryPaginationDto } from '../common/dto/query-pagination.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 
 @Injectable()
@@ -8,30 +9,78 @@ export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
   async stats() {
-    const [users, agents, properties, published, pending, inquiries, visits] = await Promise.all([
+    const [
+      users,
+      agents,
+      properties,
+      published,
+      pending,
+      featured,
+      suspended,
+      inquiries,
+      visits,
+      listingsByStatus,
+      usersByRole,
+    ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { role: 'AGENT' } }),
       this.prisma.property.count(),
       this.prisma.property.count({ where: { status: PropertyStatus.PUBLISHED } }),
       this.prisma.property.count({ where: { status: PropertyStatus.PENDING_REVIEW } }),
+      this.prisma.property.count({ where: { featured: true } }),
+      this.prisma.user.count({ where: { isActive: false } }),
       this.prisma.inquiry.count(),
       this.prisma.visit.count(),
+      this.prisma.property.groupBy({ by: ['status'], _count: { _all: true } }),
+      this.prisma.user.groupBy({ by: ['role'], _count: { _all: true } }),
     ]);
-    return { users, agents, properties, published, pending, inquiries, visits };
+
+    return {
+      users,
+      agents,
+      properties,
+      published,
+      pending,
+      featured,
+      suspended,
+      inquiries,
+      visits,
+      listingsByStatus: Object.fromEntries(
+        listingsByStatus.map((row) => [row.status, row._count._all]),
+      ),
+      usersByRole: Object.fromEntries(usersByRole.map((row) => [row.role, row._count._all])),
+    };
   }
 
-  users() {
-    return this.prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
+  async users(query: QueryPaginationDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.user.count(),
+      this.prisma.user.findMany({
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: rows,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 
   updateUser(id: string, dto: UpdateAdminUserDto) {
@@ -42,14 +91,38 @@ export class AdminService {
     });
   }
 
-  properties() {
-    return this.prisma.property.findMany({
-      include: {
-        agent: { select: { id: true, name: true, email: true } },
-        images: { take: 1, orderBy: { sortOrder: 'asc' } },
+  async properties(query: QueryPaginationDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.property.count(),
+      this.prisma.property.findMany({
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          featured: true,
+          city: true,
+          price: true,
+          listingType: true,
+          agent: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: rows.map((row) => ({ ...row, price: Number(row.price) })),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      orderBy: { updatedAt: 'desc' },
-    });
+    };
   }
 
   async approve(id: string) {

@@ -63,7 +63,7 @@ export function DropdownMenu({
                   : { left: box.left }),
               }}
               className={cn(
-                'estatex-menu overflow-hidden rounded-2xl py-1.5',
+                'estatex-menu overflow-hidden rounded-none py-1.5',
                 open ? 'animate-pop-in' : 'animate-pop-out',
               )}
             >

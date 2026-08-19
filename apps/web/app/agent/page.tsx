@@ -1,74 +1,54 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { toast } from 'sonner';
+import { Pencil, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { Button } from '@/components/ui/button';
-import { Modal } from '@/components/ui/modal';
-import { Select } from '@/components/ui/select';
-import { apiGet, apiSend } from '@/lib/api';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { IconButton } from '@/components/ui/icon-button';
+import { TablePageSkeleton } from '@/components/ui/skeleton';
+import { Pagination } from '@/components/ui/pagination';
+import { Typography } from '@/components/ui/typography';
+import {
+  useArchivePropertyMutation,
+  useMyPropertiesQuery,
+  usePublishPropertyMutation,
+} from '@/hooks/use-properties-api';
 import { formatPrice, prettyEnum } from '@/lib/format';
-import type { Property } from '@/types/property';
 
-interface InquiryRow {
-  id: string;
-  status: string;
-  name: string;
-  message: string;
-  property: { title: string; slug: string };
-}
+type ListingAction =
+  | { type: 'publish'; id: string; title: string }
+  | { type: 'delete'; id: string; title: string };
 
-interface VisitRow {
-  id: string;
-  status: string;
-  scheduledAt: string;
-  user: { name: string; email: string };
-  property: { title: string; slug: string };
-}
+function AgentListingsTable() {
+  const { user } = useAuth();
+  const enabled = user?.role === 'AGENT' || user?.role === 'ADMIN';
+  const searchParams = useSearchParams();
+  const page = Math.max(1, Number(searchParams.get('page') ?? 1) || 1);
+  const query = new URLSearchParams({ page: String(page), limit: '10' }).toString();
+  const listingsQuery = useMyPropertiesQuery(query, Boolean(enabled));
+  const publish = usePublishPropertyMutation();
+  const archive = useArchivePropertyMutation();
+  const [action, setAction] = useState<ListingAction | null>(null);
 
-export default function AgentDashboardPage() {
-  const { user, loading } = useAuth();
-  const [listings, setListings] = useState<Property[]>([]);
-  const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
-  const [visits, setVisits] = useState<VisitRow[]>([]);
-  const [archiveId, setArchiveId] = useState<string | null>(null);
+  const listings = listingsQuery.data?.data ?? [];
+  const meta = listingsQuery.data?.meta;
 
-  async function load() {
-    const [mine, agentInquiries, agentVisits] = await Promise.all([
-      apiGet<Property[]>('/properties/mine'),
-      apiGet<InquiryRow[]>('/inquiries/agent'),
-      apiGet<VisitRow[]>('/visits/agent'),
-    ]);
-    setListings(mine);
-    setInquiries(agentInquiries);
-    setVisits(agentVisits);
-  }
-
-  useEffect(() => {
-    if (user?.role === 'AGENT' || user?.role === 'ADMIN') {
-      void load().catch((error) => toast.error(error instanceof Error ? error.message : 'Failed to load'));
-    }
-  }, [user]);
-
-  if (loading) return <p className="px-4 py-20 text-center text-ink-soft">Loading…</p>;
-  if (!user || (user.role !== 'AGENT' && user.role !== 'ADMIN')) {
-    return (
-      <div className="mx-auto max-w-xl px-4 py-20 text-center">
-        <h1 className="font-display text-4xl">Agent access only</h1>
-        <Link href="/login" className="mt-4 inline-block underline">
-          Sign in as agent@estatex.dev
-        </Link>
-      </div>
-    );
+  if (listingsQuery.isLoading) {
+    return <TablePageSkeleton />;
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+    <div>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-gold-dark">Agent</p>
-          <h1 className="mt-2 font-display text-5xl">Listings</h1>
+          <Typography variant="heading">Listings</Typography>
+          <Typography variant="muted" className="mt-2">
+            Publish drafts, edit details, or remove homes from the marketplace.
+          </Typography>
         </div>
         <Link href="/agent/properties/new">
           <Button>Add property</Button>
@@ -86,129 +66,110 @@ export default function AgentDashboardPage() {
             </tr>
           </thead>
           <tbody>
-            {listings.map((property) => (
-              <tr key={property.id} className="border-b border-line/70">
-                <td className="px-4 py-3">
-                  <Link href={`/properties/${property.slug}`} className="font-medium">
-                    {property.title}
-                  </Link>
-                  <p className="text-ink-soft">{property.city}</p>
-                </td>
-                <td className="px-4 py-3">{formatPrice(property.price, property.listingType)}</td>
-                <td className="px-4 py-3">{prettyEnum(property.status ?? 'DRAFT')}</td>
-                <td className="px-4 py-3 space-x-3">
-                  <Link href={`/agent/properties/${property.id}/edit`} className="underline">
-                    Edit
-                  </Link>
-                  {property.status !== 'PUBLISHED' && property.status !== 'PENDING_REVIEW' ? (
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={async () => {
-                        await apiSend(`/properties/${property.id}/publish`, 'POST');
-                        toast.success('Submitted for review');
-                        await load();
-                      }}
-                    >
-                      Publish
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="underline"
-                    onClick={() => setArchiveId(property.id)}
-                  >
-                    Archive
-                  </button>
+            {listings.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-10 text-center text-ink-soft">
+                  No listings yet.
                 </td>
               </tr>
-            ))}
+            ) : (
+              listings.map((property) => (
+                <tr key={property.id} className="border-b border-line/70">
+                  <td className="px-4 py-3">
+                    <Link href={`/properties/${property.slug}`} className="font-medium">
+                      {property.title}
+                    </Link>
+                    <Typography variant="muted">{property.city}</Typography>
+                  </td>
+                  <td className="px-4 py-3">{formatPrice(property.price, property.listingType)}</td>
+                  <td className="px-4 py-3">{prettyEnum(property.status ?? 'DRAFT')}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <IconButton
+                        label="Edit"
+                        href={`/agent/properties/${property.id}/edit`}
+                        icon={<Pencil className="h-4 w-4" />}
+                      />
+                      {property.status !== 'PUBLISHED' && property.status !== 'PENDING_REVIEW' ? (
+                        <IconButton
+                          label="Publish"
+                          icon={<Upload className="h-4 w-4" />}
+                          onClick={() =>
+                            setAction({ type: 'publish', id: property.id, title: property.title })
+                          }
+                        />
+                      ) : null}
+                      <IconButton
+                        label="Delete"
+                        tone="danger"
+                        icon={<Trash2 className="h-4 w-4" />}
+                        onClick={() =>
+                          setAction({ type: 'delete', id: property.id, title: property.title })
+                        }
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      <div className="mt-12 grid gap-8 lg:grid-cols-2">
-        <section>
-          <h2 className="font-display text-3xl">Inquiries</h2>
-          <ul className="mt-4 space-y-3">
-            {inquiries.map((item) => (
-              <li key={item.id} className="rounded-2xl border border-line bg-white p-4">
-                <p className="font-medium">{item.name}</p>
-                <p className="text-sm text-ink-soft">
-                  {item.property.title} · {prettyEnum(item.status)}
-                </p>
-                <p className="mt-2 text-sm">{item.message}</p>
-                <Select
-                  className="mt-3"
-                  value={item.status}
-                  onChange={async (status) => {
-                    await apiSend(`/inquiries/${item.id}/status`, 'PATCH', { status });
-                    await load();
-                  }}
-                  options={[
-                    { value: 'NEW', label: 'New' },
-                    { value: 'CONTACTED', label: 'Contacted' },
-                    { value: 'IN_PROGRESS', label: 'In progress' },
-                    { value: 'CLOSED', label: 'Closed' },
-                  ]}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section>
-          <h2 className="font-display text-3xl">Visits</h2>
-          <ul className="mt-4 space-y-3">
-            {visits.map((item) => (
-              <li key={item.id} className="rounded-2xl border border-line bg-white p-4">
-                <p className="font-medium">{item.user.name}</p>
-                <p className="text-sm text-ink-soft">
-                  {item.property.title} · {new Date(item.scheduledAt).toLocaleString()}
-                </p>
-                <Select
-                  className="mt-3"
-                  value={item.status}
-                  onChange={async (status) => {
-                    await apiSend(`/visits/${item.id}/status`, 'PATCH', { status });
-                    await load();
-                  }}
-                  options={[
-                    { value: 'REQUESTED', label: 'Requested' },
-                    { value: 'CONFIRMED', label: 'Confirmed' },
-                    { value: 'CANCELLED', label: 'Cancelled' },
-                    { value: 'COMPLETED', label: 'Completed' },
-                  ]}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
+      {meta ? (
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          hrefForPage={(nextPage) => `/agent?page=${nextPage}`}
+        />
+      ) : null}
 
-      <Modal
-        open={Boolean(archiveId)}
-        onClose={() => setArchiveId(null)}
-        title="Archive this listing?"
-      >
-        <p className="text-sm leading-6 text-ink-soft">
-          It will leave the public marketplace. You can still find it in your agent workspace.
-        </p>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="ghost" onClick={() => setArchiveId(null)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={async () => {
-              if (!archiveId) return;
-              await apiSend(`/properties/${archiveId}/archive`, 'POST');
-              setArchiveId(null);
-              await load();
-            }}
-          >
-            Archive
-          </Button>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        open={action?.type === 'publish'}
+        title="Publish this listing?"
+        description={`“${action?.title ?? 'This listing'}” will be submitted for review before it goes live.`}
+        confirmLabel="Publish"
+        loading={publish.isPending}
+        onClose={() => setAction(null)}
+        onConfirm={() => {
+          if (action?.type !== 'publish') return;
+          publish.mutate(action.id, {
+            onSuccess: () => {
+              toast.success('Submitted for review');
+              setAction(null);
+            },
+            onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed'),
+          });
+        }}
+      />
+
+      <ConfirmDialog
+        open={action?.type === 'delete'}
+        title="Delete this listing?"
+        description={`“${action?.title ?? 'This listing'}” will be removed from the marketplace. You can still find it in your agent workspace.`}
+        confirmLabel="Delete"
+        danger
+        loading={archive.isPending}
+        onClose={() => setAction(null)}
+        onConfirm={() => {
+          if (action?.type !== 'delete') return;
+          archive.mutate(action.id, {
+            onSuccess: () => {
+              toast.success('Listing deleted');
+              setAction(null);
+            },
+            onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed'),
+          });
+        }}
+      />
     </div>
+  );
+}
+
+export default function AgentListingsPage() {
+  return (
+    <Suspense fallback={<TablePageSkeleton />}>
+      <AgentListingsTable />
+    </Suspense>
   );
 }

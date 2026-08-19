@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PropertyStatus, Role, VisitStatus } from '@prisma/client';
 import type { AuthUser } from '../common/decorators/current-user.decorator';
+import { QueryPaginationDto } from '../common/dto/query-pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateVisitStatusDto } from './dto/update-visit-status.dto';
@@ -79,18 +80,35 @@ export class VisitsService {
     });
   }
 
-  agent(user: AuthUser) {
+  async agent(user: AuthUser, query: QueryPaginationDto) {
     if (user.role !== Role.AGENT && user.role !== Role.ADMIN) {
       throw new ForbiddenException();
     }
-    return this.prisma.visit.findMany({
-      where: user.role === Role.ADMIN ? {} : { agentId: user.id },
-      include: {
-        property: { select: { id: true, title: true, slug: true, city: true } },
-        user: { select: { id: true, name: true, email: true, phone: true } },
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const where = user.role === Role.ADMIN ? {} : { agentId: user.id };
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.visit.count({ where }),
+      this.prisma.visit.findMany({
+        where,
+        include: {
+          property: { select: { id: true, title: true, slug: true, city: true } },
+          user: { select: { id: true, name: true, email: true, phone: true } },
+        },
+        orderBy: { scheduledAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+    return {
+      data: rows,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      orderBy: { scheduledAt: 'desc' },
-    });
+    };
   }
 
   async updateStatus(user: AuthUser, id: string, dto: UpdateVisitStatusDto) {

@@ -13,6 +13,7 @@ import {
 import { CurrentUser, type AuthUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
+import { QueryPaginationDto } from '../common/dto/query-pagination.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { QueryPropertiesDto } from './dto/query-properties.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -37,8 +38,14 @@ export class PropertiesController {
 
   @Roles(Role.AGENT, Role.ADMIN)
   @Get('mine')
-  findMine(@CurrentUser() user: AuthUser) {
-    return this.properties.findMine(user);
+  findMine(@CurrentUser() user: AuthUser, @Query() query: QueryPaginationDto) {
+    return this.properties.findMine(user, query);
+  }
+
+  @Roles(Role.AGENT, Role.ADMIN)
+  @Get('mine/:id')
+  findMineOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.properties.findMineOne(user, id);
   }
 
   @Public()
