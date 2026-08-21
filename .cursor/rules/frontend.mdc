@@ -1,6 +1,6 @@
 ---
 description: Next.js frontend conventions for EstateX
-globs: apps/web/**/*.{ts,tsx,css}
+globs: frontend/**/*.{ts,tsx,css}
 alwaysApply: false
 ---
 

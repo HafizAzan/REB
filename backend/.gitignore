@@ -1,0 +1,26 @@
+# dependencies
+/node_modules
+
+# build
+/dist
+/build
+/coverage
+*.tsbuildinfo
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# misc
+.DS_Store
+Thumbs.db
+.idea
+.tmp
+uploads

@@ -1,6 +1,6 @@
 ---
 description: NestJS backend conventions for EstateX
-globs: apps/api/**/*.ts
+globs: backend/**/*.ts
 alwaysApply: false
 ---
 

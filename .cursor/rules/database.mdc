@@ -1,6 +1,6 @@
 ---
 description: Prisma and PostgreSQL rules for EstateX
-globs: apps/api/prisma/**/*
+globs: backend/prisma/**/*
 alwaysApply: false
 ---
 
